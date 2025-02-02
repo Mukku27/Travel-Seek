@@ -242,7 +242,7 @@ if 'qa_expanded' not in st.session_state:
 try:
     # Set API keys
     os.environ["GROQ_API_KEY"] = os.getenv("GROQ_API_KEY")
-    os.environ["SERP_API_KEY"] = os.getenv("SERP_API_KEY")
+    os.environ["SERPI_API_KEY"] = os.getenv("SERPI_API_KEY")
 
     # Initialize single travel agent
     travel_agent = TravelAgent()
