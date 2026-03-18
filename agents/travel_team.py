@@ -30,7 +30,7 @@ class TravelTeam:
         self.team = Team(
             name="Travel Planning Team",
             mode="coordinate",
-            model=Groq(id="deepseek-r1-distill-llama-70b"),
+            model=Groq(id="qwen/qwen3-32b"),
             members=[
                 self.research_agent,
                 self.itinerary_agent,
@@ -48,8 +48,9 @@ class TravelTeam:
                 "Ensure no duplicate information across sections.",
                 "Format the final output in clean markdown with clear section headers.",
             ],
-            show_tool_calls=True,
             markdown=True,
+            show_members_responses=True,
+            debug_mode=True,
         )
 
     def generate_travel_plan(

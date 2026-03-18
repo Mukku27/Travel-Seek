@@ -15,7 +15,7 @@ def create_research_agent() -> Agent:
     return Agent(
         name="Research Agent",
         role="Destination Research Specialist",
-        model=Groq(id="deepseek-r1-distill-llama-70b"),
+        model=Groq(id="qwen/qwen3-32b"),
         tools=[DuckDuckGoTools()],
         instructions=[
             "You are a destination research specialist.",
@@ -31,6 +31,6 @@ def create_research_agent() -> Agent:
             "Present findings in well-organized markdown with clear sections.",
             "Focus on accuracy over volume - only include verified information.",
         ],
-        show_tool_calls=True,
         markdown=True,
+        debug_mode=True,
     )

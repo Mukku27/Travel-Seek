@@ -13,7 +13,7 @@ def create_itinerary_agent() -> Agent:
     return Agent(
         name="Itinerary Planner",
         role="Day-by-Day Itinerary Specialist",
-        model=Groq(id="deepseek-r1-distill-llama-70b"),
+        model=Groq(id="qwen/qwen3-32b"),
         instructions=[
             "You are an expert itinerary planner.",
             "Using the research data provided, create optimized day-by-day travel plans.",
@@ -26,6 +26,6 @@ def create_itinerary_agent() -> Agent:
             "Balance packed sightseeing with downtime based on travel style.",
             "Format as clear markdown with day headers and time-based schedules.",
         ],
-        show_tool_calls=True,
         markdown=True,
+        debug_mode=True,
     )

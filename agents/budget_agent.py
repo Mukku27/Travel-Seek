@@ -14,7 +14,7 @@ def create_budget_agent() -> Agent:
     return Agent(
         name="Budget Analyst",
         role="Travel Budget and Cost Specialist",
-        model=Groq(id="deepseek-r1-distill-llama-70b"),
+        model=Groq(id="qwen/qwen3-32b"),
         tools=[DuckDuckGoTools()],
         instructions=[
             "You are a travel budget analyst.",
@@ -32,6 +32,6 @@ def create_budget_agent() -> Agent:
             "Provide currency conversion rates where relevant.",
             "Format as markdown with comparison tables where appropriate.",
         ],
-        show_tool_calls=True,
         markdown=True,
+        debug_mode=True,
     )

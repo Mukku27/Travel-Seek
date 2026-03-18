@@ -14,7 +14,7 @@ def create_local_expert_agent() -> Agent:
     return Agent(
         name="Local Expert",
         role="Cultural and Local Knowledge Specialist",
-        model=Groq(id="deepseek-r1-distill-llama-70b"),
+        model=Groq(id="qwen/qwen3-32b"),
         tools=[DuckDuckGoTools()],
         instructions=[
             "You are a local expert with deep cultural knowledge.",
@@ -30,6 +30,6 @@ def create_local_expert_agent() -> Agent:
             "Write in an engaging, friendly tone as if advising a friend.",
             "Format as markdown with clear categories.",
         ],
-        show_tool_calls=True,
         markdown=True,
+        debug_mode=True,
     )
