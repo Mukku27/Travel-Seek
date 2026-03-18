@@ -12,8 +12,8 @@ import streamlit as st
 
 # Import configuration to load API keys and settings
 import config
-# Import the TravelAgent class to handle AI interactions
-from agent import TravelAgent
+# Import the TravelTeam class to handle multi-agent AI interactions
+from agents import TravelTeam
 
 # Set page configuration
 st.set_page_config(
@@ -125,8 +125,8 @@ if 'qa_expanded' not in st.session_state:
     st.session_state.qa_expanded = False
 
 try:
-    # Initialize the travel agent
-    travel_agent = TravelAgent()
+    # Initialize the travel team (multi-agent)
+    travel_agent = TravelTeam()
 
     # Main UI Header
     st.title("🌎 AI Travel Planner")
