@@ -1,26 +1,23 @@
 """
 app.py
 
-The main entry point of the application. It initializes Streamlit, handles user inputs via the sidebar, 
-and uses the TravelAgent from agent.py to generate travel plans or answer questions. This module also 
-applies UI styling and layout configurations.
+Main entry point. Supports both one-shot travel plan generation and
+multi-turn conversational planning with session memory.
 """
 
-import os
+import uuid
 from datetime import datetime
 import streamlit as st
 
-# Import configuration to load API keys and settings
 import config
-# Import the TravelTeam class to handle multi-agent AI interactions
 from agents import TravelTeam
+from models import UserPreferences
 
-# Set page configuration
 st.set_page_config(
     page_title="AI Travel Planner",
     page_icon="🌎",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="expanded",
 )
 
 # Custom CSS styling
@@ -78,109 +75,139 @@ st.markdown("""
         color: var(--primary-color);
         margin-bottom: 0.5rem;
     }
-    .spinner-text {
-        font-size: 1.2rem;
-        font-weight: bold;
-        color: var(--primary-color);
-    }
     </style>
 """, unsafe_allow_html=True)
 
-# Sidebar configuration for user inputs
+# ── Session state initialization ──
+if "session_id" not in st.session_state:
+    st.session_state.session_id = str(uuid.uuid4())
+if "preferences" not in st.session_state:
+    st.session_state.preferences = UserPreferences()
+if "chat_messages" not in st.session_state:
+    st.session_state.chat_messages = []
+if "travel_plan" not in st.session_state:
+    st.session_state.travel_plan = None
+
+# ── Sidebar ──
 with st.sidebar:
     st.image("https://img.icons8.com/clouds/200/airplane-take-off.png")
     st.title("Trip Settings")
-    
+
     destination = st.text_input("🌍 Where would you like to go?", "")
     present_location = st.text_input("📍 What's your current location?", "")
-    
+
     start_date = st.date_input("📅 Start Date", min_value=datetime.today())
     end_date = st.date_input("📅 End Date", min_value=start_date)
-    
-    # Calculate duration based on selected dates
+
     if start_date and end_date:
         duration = (end_date - start_date).days + 1
     else:
         duration = config.DEFAULT_DURATION
-    
+
     budget = st.select_slider(
         "💰 What's your budget level?",
         options=["Budget", "Moderate", "Luxury"],
-        value="Moderate"
+        value="Moderate",
     )
-    
+
     all_styles = ["Culture", "Nature", "Adventure", "Relaxation", "Food", "Shopping", "Entertainment"]
     selected_styles = st.multiselect(
         "🎯 Travel Style",
         ["All"] + all_styles,
-        key="style_selector"
+        key="style_selector",
     )
-    
     travel_style = all_styles if "All" in selected_styles else selected_styles
 
-# Initialize session state for travel plan and Q&A
-if 'travel_plan' not in st.session_state:
-    st.session_state.travel_plan = None
-if 'qa_expanded' not in st.session_state:
-    st.session_state.qa_expanded = False
+    # ── Extracted preferences display ──
+    st.divider()
+    st.subheader("Extracted Preferences")
+    st.text(st.session_state.preferences.summary())
+
+    if st.button("Reset Session"):
+        st.session_state.session_id = str(uuid.uuid4())
+        st.session_state.preferences = UserPreferences()
+        st.session_state.chat_messages = []
+        st.session_state.travel_plan = None
+        st.rerun()
 
 try:
-    # Initialize the travel team (multi-agent)
-    travel_agent = TravelTeam()
+    travel_agent = TravelTeam(session_id=st.session_state.session_id)
 
-    # Main UI Header
     st.title("🌎 AI Travel Planner")
-    
-    st.markdown(f"""
-        <div class="travel-summary">
-            <h4>Welcome to your personal AI Travel Assistant! 🌟</h4>
-            <p>Let me help you create your perfect travel itinerary based on your preferences.</p>
-            <p><strong>Destination:</strong> {destination}</p>
-            <p><strong>Duration:</strong> {duration} days</p>
-            <p><strong>Budget:</strong> {budget}</p>
-            <p><strong>Travel Styles:</strong> {', '.join(travel_style)}</p>
-        </div>
-    """, unsafe_allow_html=True)
 
-    # Button to generate the travel plan
-    if st.button("✨ Generate My Perfect Travel Plan", type="primary"):
-        if destination:
-            try:
+    # ── Tab layout: One-shot plan vs. Conversational ──
+    tab_plan, tab_chat = st.tabs(["Generate Plan", "Chat with Planner"])
+
+    # ── Tab 1: One-shot travel plan generation ──
+    with tab_plan:
+        st.markdown(f"""
+            <div class="travel-summary">
+                <h4>Generate a complete travel plan</h4>
+                <p><strong>Destination:</strong> {destination}</p>
+                <p><strong>Duration:</strong> {duration} days</p>
+                <p><strong>Budget:</strong> {budget}</p>
+                <p><strong>Travel Styles:</strong> {', '.join(travel_style)}</p>
+            </div>
+        """, unsafe_allow_html=True)
+
+        if st.button("✨ Generate My Perfect Travel Plan", type="primary"):
+            if destination:
                 with st.spinner("🔍 Researching and planning your trip..."):
                     travel_plan = travel_agent.generate_travel_plan(
-                        destination,
-                        present_location,
-                        start_date,
-                        end_date,
-                        budget,
-                        travel_style,
-                        duration
+                        destination, present_location, start_date, end_date,
+                        budget, travel_style, duration,
                     )
                     st.session_state.travel_plan = travel_plan
                     st.markdown(travel_plan)
-            except Exception as e:
-                st.error(f"Error generating travel plan: {str(e)}")
-        else:
-            st.warning("Please enter a destination")
-
-    # Q&A Section for asking specific questions about the travel plan
-    st.divider()
-    
-    qa_expander = st.expander("🤔 Ask a specific question about your destination or travel plan", 
-                              expanded=st.session_state.qa_expanded)
-    
-    with qa_expander:
-        st.session_state.qa_expanded = True
-        question = st.text_input("Your question:", placeholder="What would you like to know about your trip?")
-        if st.button("Get Answer", key="qa_button"):
-            if question and st.session_state.travel_plan:
-                with st.spinner("🔍 Finding answer..."):
-                    answer = travel_agent.answer_question(question, st.session_state.travel_plan, destination)
-                    if answer:
-                        st.markdown(answer)
-            elif not st.session_state.travel_plan:
-                st.warning("Please generate a travel plan first before asking questions.")
             else:
-                st.warning("Please enter a question")
+                st.warning("Please enter a destination")
+
+        if st.session_state.travel_plan:
+            with st.expander("🤔 Ask about your plan"):
+                question = st.text_input("Your question:", key="plan_question")
+                if st.button("Get Answer", key="qa_button"):
+                    if question:
+                        with st.spinner("🔍 Finding answer..."):
+                            answer = travel_agent.answer_question(
+                                question, st.session_state.travel_plan, destination,
+                            )
+                            if answer:
+                                st.markdown(answer)
+                    else:
+                        st.warning("Please enter a question")
+
+    # ── Tab 2: Multi-turn conversational planning ──
+    with tab_chat:
+        st.markdown("""
+            <div class="travel-summary">
+                <h4>Conversational Travel Planner</h4>
+                <p>Chat naturally to build and refine your travel plan step by step.</p>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # Display chat history
+        for msg in st.session_state.chat_messages:
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+
+        # Chat input
+        if user_input := st.chat_input("Tell me about your trip plans..."):
+            # Show user message
+            st.session_state.chat_messages.append({"role": "user", "content": user_input})
+            with st.chat_message("user"):
+                st.markdown(user_input)
+
+            # Get response
+            with st.chat_message("assistant"):
+                with st.spinner("Planning..."):
+                    response = travel_agent.chat(
+                        user_input, st.session_state.preferences,
+                    )
+                    st.markdown(response)
+
+            st.session_state.chat_messages.append({"role": "assistant", "content": response})
+            # Refresh sidebar preferences
+            st.rerun()
+
 except Exception as e:
     st.error(f"Application Error: {str(e)}")

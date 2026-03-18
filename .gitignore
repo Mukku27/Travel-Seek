@@ -1,3 +1,5 @@
 travel-seek
 .env
 __pycache__
+tmp/
+.venv/
