@@ -4,3 +4,4 @@ groq
 ddgs
 pycountry
 python-dotenv
+sqlalchemy

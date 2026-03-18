@@ -14,6 +14,9 @@ def clean_response(response_text):
     Returns:
         str: The cleaned response text.
     """
-    # Example clean-up: replace unwanted characters and extra newlines.
-    cleaned = response_text.replace('∣', '|').replace('\n\n\n', '\n\n')
+    import re
+    # Strip <think>...</think> reasoning tags (Qwen3 model)
+    cleaned = re.sub(r"<think>.*?</think>", "", response_text, flags=re.DOTALL)
+    # Replace unwanted characters and extra newlines
+    cleaned = cleaned.replace('∣', '|').replace('\n\n\n', '\n\n').strip()
     return cleaned
