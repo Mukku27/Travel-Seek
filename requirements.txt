@@ -1,8 +1,6 @@
 streamlit
-phidata
+agno
 groq
-duckduckgo-search
-googlesearch-python
+ddgs
 pycountry
-google-search-results
 python-dotenv
