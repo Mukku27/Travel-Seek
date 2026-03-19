@@ -2,21 +2,31 @@
 research_agent.py
 
 Gathers comprehensive destination information using DuckDuckGo search.
+Optionally uses Tavily for higher-quality results when USE_TAVILY is set.
 Researches weather, safety, visa requirements, attractions, restaurants,
 local transport, currency, and tipping culture.
 """
 
+import os
+
 from agno.agent import Agent
 from agno.models.groq import Groq
 from agno.tools.duckduckgo import DuckDuckGoTools
+from agno.tools.tavily import TavilyTools
+
+USE_TAVILY = os.getenv("USE_TAVILY", "false").lower() in ("true", "1", "yes")
 
 
 def create_research_agent() -> Agent:
+    tools = [DuckDuckGoTools()]
+    if USE_TAVILY:
+        tools.append(TavilyTools(search=True, max_tokens=8000, search_depth="advanced"))
+
     return Agent(
         name="Research Agent",
         role="Destination Research Specialist",
         model=Groq(id="qwen/qwen3-32b"),
-        tools=[DuckDuckGoTools()],
+        tools=tools,
         instructions=[
             "You are a destination research specialist.",
             "Your job is to gather comprehensive, factual information about travel destinations.",
