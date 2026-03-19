@@ -5,3 +5,5 @@ ddgs
 pycountry
 python-dotenv
 sqlalchemy
+requests
+pytest

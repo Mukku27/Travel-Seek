@@ -31,11 +31,13 @@ Travel Styles: {travel_style_str}
 Your Task:
 Provide a structured markdown response that includes the following elements:
 
-🌞 Best Time to Visit:
+🌞 Best Time to Visit & Weather:
  - Highlight seasonal considerations for visiting {destination}.
- - Day-by-day weather forecast from {start_date} to {end_date}.
+ - Day-by-day weather forecast from {start_date} to {end_date} (use weather tools if available).
+ - For each day, indicate whether the weather favors indoor or outdoor activities.
  - Alternative date suggestions if weather is unfavorable. Include source links for all weather data.
- - Offer clothing recommendations for each day based on weather forecasts (e.g., warm jackets for cold days, light clothing for sunny days).
+ - Offer clothing and packing recommendations based on weather forecasts (e.g., warm jackets for cold days, light clothing for sunny days, umbrella for rain).
+ - Provide a consolidated packing checklist based on the overall weather conditions.
 
 🏨 Accommodation Recommendations:
  - Suggest accommodations within the {budget} range.

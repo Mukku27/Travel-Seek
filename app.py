@@ -133,6 +133,12 @@ with st.sidebar:
 try:
     travel_agent = TravelTeam(session_id=st.session_state.session_id)
 
+    if not travel_agent.weather_available:
+        st.info(
+            "Weather API unavailable (OPENWEATHERMAP_API_KEY not set). "
+            "Weather data will come from general web searches instead of real-time forecasts."
+        )
+
     st.title("🌎 AI Travel Planner")
 
     # ── Tab layout: One-shot plan vs. Conversational ──

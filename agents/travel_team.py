@@ -4,9 +4,14 @@ travel_team.py
 Team orchestrator that coordinates the 4 specialized agents.
 Supports multi-turn conversational planning with session memory
 persisted in SQLite.
+
+When OPENWEATHERMAP_API_KEY is available, the Research and Itinerary
+agents gain access to real weather forecast data. If the key is missing,
+the team falls back gracefully to DuckDuckGo-only mode.
 """
 
 import json
+import os
 import re
 import streamlit as st
 from agno.agent import Agent
@@ -18,6 +23,7 @@ from agents.research_agent import create_research_agent
 from agents.itinerary_agent import create_itinerary_agent
 from agents.budget_agent import create_budget_agent
 from agents.local_expert_agent import create_local_expert_agent
+from tools import WeatherTools
 from models import UserPreferences
 from prompt import get_travel_plan_prompt, get_answer_question_prompt
 from utils import clean_response
@@ -32,8 +38,18 @@ class TravelTeam:
         self.session_id = session_id
         self.db = SqliteDb(db_file=DB_FILE)
 
-        self.research_agent = create_research_agent()
-        self.itinerary_agent = create_itinerary_agent()
+        self.weather_available = False
+        self._weather_tools = None
+        if os.getenv("OPENWEATHERMAP_API_KEY"):
+            try:
+                self._weather_tools = WeatherTools()
+                self.weather_available = True
+            except Exception:
+                self._weather_tools = None
+
+        weather = self._weather_tools if self.weather_available else None
+        self.research_agent = create_research_agent(weather_tools=weather)
+        self.itinerary_agent = create_itinerary_agent(weather_tools=weather)
         self.budget_agent = create_budget_agent()
         self.local_expert_agent = create_local_expert_agent()
 
