@@ -11,6 +11,7 @@ from phi.agent import Agent
 from phi.model.groq import Groq
 from phi.tools.serpapi_tools import SerpApiTools
 from phi.tools.duckduckgo import DuckDuckGo
+from phi.tools.tavily import TavilyTools
 from prompt import get_travel_plan_prompt, get_answer_question_prompt
 from utils import clean_response
 
@@ -23,7 +24,6 @@ class TravelAgent:
         tools = [SerpApiTools(), DuckDuckGo()]
 
         if os.getenv("USE_TAVILY", "").lower() in ("true", "1", "yes"):
-            from phi.tools.tavily import TavilyTools
             tools.append(TavilyTools())
 
         self.agent = Agent(
