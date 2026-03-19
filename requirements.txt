@@ -5,3 +5,4 @@ ddgs
 pycountry
 python-dotenv
 sqlalchemy
+tavily-python
