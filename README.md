@@ -1,25 +1,27 @@
 # Travel-Seek
 
-Travel-Seek is an AI-powered travel planning assistant that helps you create personalized travel itineraries and answer travel-related questions. The application leverages advanced AI models to provide comprehensive travel plans, including accommodation recommendations, day-by-day itineraries, and practical travel tips.
+Travel-Seek is an AI-powered travel planning assistant that helps you create personalized travel itineraries and answer travel-related questions. The application leverages a coordinated multi-agent team (powered by Agno + Groq) and optionally enriches results with real Google Places & Directions data via a custom MCP server.
 
 ## Features
 
-- **Personalized Travel Plans**: Generate detailed travel itineraries based on your preferences, including budget, travel style, and duration.
-- **Q&A Section**: Get instant and accurate answers to travel-related questions.
-- **Interactive UI**: User-friendly interface built with Streamlit for seamless interaction and customization.
+- **Multi-Agent Travel Planning**: Four specialized AI agents (Research, Itinerary, Budget, Local Expert) coordinate to produce comprehensive travel plans.
+- **Google Places Integration**: Real ratings, reviews, hours, and directions via a custom MCP server backed by the Google Maps API.
+- **Conversational Planning**: Chat naturally to build and refine your plan with session memory.
+- **Graceful Fallback**: Works without a Google Maps key — falls back to DuckDuckGo search with a visible warning.
+- **Standalone MCP Server**: The Places MCP server works independently with Claude Desktop or any MCP-compatible client.
 
 ## Installation
 
 ### 1. Clone the Repository
 ```sh
-git clone https://github.com/yourusername/travel-seek.git
-cd travel-seek
+git clone https://github.com/Mukku27/Travel-Seek.git
+cd Travel-Seek
 ```
 
 ### 2. Create and Activate a Virtual Environment
 ```sh
-python3 -m venv travel-seek
-source travel-seek/bin/activate  # On Windows use `travel-seek\Scripts\activate`
+python3 -m venv .venv
+source .venv/bin/activate  # On Windows use `.venv\Scripts\activate`
 ```
 
 ### 3. Install Dependencies
@@ -28,43 +30,101 @@ pip install -r requirements.txt
 ```
 
 ### 4. Set Up Environment Variables
-- Create a `.env` file in the root directory and add your API keys:
+Create a `.env` file in the root directory:
 ```sh
 GROQ_API_KEY='your_groq_api_key'
-SERPI_API_KEY='your_serpi_api_key'
+GOOGLE_MAPS_API_KEY='your_google_maps_api_key'   # Optional — enables Places & Directions
 ```
+
+The `GOOGLE_MAPS_API_KEY` requires the following APIs enabled in your Google Cloud project:
+- Places API
+- Directions API
+- Geocoding API
+
+If the key is not set, the app works normally using DuckDuckGo for all research.
 
 ## Usage
 
-### 1. Run the Streamlit Application
+### Run the Streamlit Application
 ```sh
 streamlit run app.py
 ```
 
-### 2. Access the Application
-- Open your web browser and go to `http://localhost:8501`.
-- Enter your trip details in the sidebar, including destination, current location, start and end dates, budget, and travel style.
-- Click the **"✨ Generate My Perfect Travel Plan"** button to create a personalized itinerary.
-- Use the Q&A section for specific travel queries.
+Open your browser at `http://localhost:8501`, enter your trip details in the sidebar, and either generate a one-shot plan or chat interactively.
+
+### Run Tests
+```sh
+pytest tests/ -v
+```
 
 ## Project Structure
 
 ```
-travel-seek/
-├── bin/
-├── etc/
-├── include/
-├── lib/
-├── share/
-├── __pycache__/
-├── agent.py         # Handles AI interactions for travel planning
-├── app.py           # Main entry point, initializes Streamlit and UI
-├── config.py        # Manages configuration settings and environment variables
-├── LICENSE          # License file
-├── prompt.py        # Generates AI prompts for itinerary creation
-├── README.md        # Project documentation
-├── requirements.txt # Dependencies list
-├── utils.py         # Utility functions used in the application
+Travel-Seek/
+├── agents/
+│   ├── __init__.py
+│   ├── travel_team.py        # Team orchestrator with MCP lifecycle
+│   ├── research_agent.py     # DuckDuckGo + optional MCP tools
+│   ├── itinerary_agent.py    # Day-by-day planner + optional Directions
+│   ├── budget_agent.py       # Cost estimates via DuckDuckGo
+│   └── local_expert_agent.py # Cultural tips via DuckDuckGo
+├── mcp_servers/
+│   ├── __init__.py
+│   ├── config.py             # API key management & client factory
+│   ├── places_tools.py       # Core Google Maps tool logic
+│   └── places_server.py      # FastMCP server (3 tools)
+├── tests/
+│   ├── test_places_tools.py
+│   ├── test_places_server.py
+│   ├── test_mcp_config.py
+│   ├── test_travel_team_fallback.py
+│   ├── test_models.py
+│   └── test_utils.py
+├── app.py                    # Streamlit entry point
+├── config.py                 # App configuration
+├── models.py                 # Pydantic models
+├── prompt.py                 # Prompt templates
+├── utils.py                  # Response cleaning utilities
+├── requirements.txt
+└── README.md
+```
+
+## MCP Server
+
+The `mcp_servers/` package exposes three Google Maps tools as a standalone MCP server:
+
+| Tool | Description |
+|------|-------------|
+| `search_places` | Geocodes a location, then runs a Places Nearby Search. Returns top 5 results with name, rating, address, price level, etc. |
+| `get_place_details` | Fetches rich details for a place: reviews, hours, phone, website, geometry. |
+| `get_directions` | Computes directions between two locations with distance, duration, and step-by-step instructions. |
+
+### Run Standalone (stdio)
+```sh
+python -m mcp_servers.places_server
+```
+
+### Run with SSE Transport
+```sh
+python -m mcp_servers.places_server --transport sse --port 8000
+```
+
+### Claude Desktop Configuration
+
+Add this to your Claude Desktop MCP config:
+
+```json
+{
+  "mcpServers": {
+    "travel-seek-places": {
+      "command": "python",
+      "args": ["-m", "mcp_servers.places_server"],
+      "env": {
+        "GOOGLE_MAPS_API_KEY": "your_key"
+      }
+    }
+  }
+}
 ```
 
 ## License
@@ -72,8 +132,3 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ## Contributing
 Contributions are welcome! Please open an issue or submit a pull request for any improvements or bug fixes.
-
----
-
-Happy travels with Travel-Seek! 🌍✈️
-
