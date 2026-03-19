@@ -32,6 +32,10 @@ pip install -r requirements.txt
 ```sh
 GROQ_API_KEY='your_groq_api_key'
 SERPI_API_KEY='your_serpi_api_key'
+
+# Optional: enable Tavily search (alongside SerpAPI/DuckDuckGo)
+USE_TAVILY=true
+TAVILY_API_KEY='your_tavily_api_key'
 ```
 
 ## Usage

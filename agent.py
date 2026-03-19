@@ -5,11 +5,13 @@ This module manages the AI agent logic. It wraps the interactions with the AI mo
 generation and decision-making. The TravelAgent class uses prompt functions from prompt.py to generate the required prompts.
 """
 
+import os
 import streamlit as st
 from phi.agent import Agent
 from phi.model.groq import Groq
 from phi.tools.serpapi_tools import SerpApiTools
 from phi.tools.duckduckgo import DuckDuckGo
+from phi.tools.tavily import TavilyTools
 from prompt import get_travel_plan_prompt, get_answer_question_prompt
 from utils import clean_response
 
@@ -19,10 +21,15 @@ class TravelAgent:
     or answering questions.
     """
     def __init__(self):
+        tools = [SerpApiTools(), DuckDuckGo()]
+
+        if os.getenv("USE_TAVILY", "").lower() in ("true", "1", "yes"):
+            tools.append(TavilyTools())
+
         self.agent = Agent(
             name="Comprehensive Travel Assistant",
             model=Groq(id="deepseek-r1-distill-llama-70b"),
-            tools=[SerpApiTools(), DuckDuckGo()],
+            tools=tools,
             instructions=[
                 "You are a comprehensive travel planning assistant with expertise in all aspects of travel.",
                 "For every recommendation and data point, you MUST provide working source links.",
