@@ -14,12 +14,12 @@ from agno.models.groq import Groq
 from agno.tools.duckduckgo import DuckDuckGoTools
 from agno.tools.tavily import TavilyTools
 
-USE_TAVILY = os.getenv("USE_TAVILY", "false").lower() in ("true", "1", "yes")
-
 
 def create_research_agent() -> Agent:
+    use_tavily = os.getenv("USE_TAVILY", "false").lower() in ("true", "1", "yes")
+
     tools = [DuckDuckGoTools()]
-    if USE_TAVILY:
+    if use_tavily:
         tools.append(TavilyTools(search=True, max_tokens=8000, search_depth="advanced"))
 
     return Agent(
