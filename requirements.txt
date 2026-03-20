@@ -6,4 +6,3 @@ tavily-python
 pycountry
 python-dotenv
 sqlalchemy
-tavily-python
