@@ -2,20 +2,27 @@
 local_expert_agent.py
 
 Provides insider tips, cultural context, and off-the-beaten-path experiences.
-Uses DuckDuckGo for research.
+Uses DuckDuckGo for research, with optional Tavily integration for richer results.
 """
+
+import os
 
 from agno.agent import Agent
 from agno.models.groq import Groq
 from agno.tools.duckduckgo import DuckDuckGoTools
+from agno.tools.tavily import TavilyTools
 
 
 def create_local_expert_agent() -> Agent:
+    tools = [DuckDuckGoTools()]
+    if os.getenv("USE_TAVILY", "").lower() in ("1", "true", "yes"):
+        tools.append(TavilyTools(search=True, max_tokens=8000, search_depth="advanced"))
+
     return Agent(
         name="Local Expert",
         role="Cultural and Local Knowledge Specialist",
         model=Groq(id="qwen/qwen3-32b"),
-        tools=[DuckDuckGoTools()],
+        tools=tools,
         instructions=[
             "You are a local expert with deep cultural knowledge.",
             "Provide insider tips that tourists typically miss:",

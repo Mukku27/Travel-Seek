@@ -2,7 +2,7 @@ streamlit
 agno
 groq
 ddgs
+tavily-python
 pycountry
 python-dotenv
-tavily-python
 sqlalchemy
