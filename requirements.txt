@@ -6,3 +6,8 @@ tavily-python
 pycountry
 python-dotenv
 sqlalchemy
+googlemaps
+fastmcp
+nest-asyncio
+pytest
+pytest-asyncio

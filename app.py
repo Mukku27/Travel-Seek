@@ -133,6 +133,12 @@ with st.sidebar:
 try:
     travel_agent = TravelTeam(session_id=st.session_state.session_id)
 
+    if not travel_agent.mcp_available:
+        st.warning(
+            f"{travel_agent.mcp_status_reason or 'Google Places API unavailable.'} "
+            "Using DuckDuckGo fallback — results may be less precise."
+        )
+
     st.title("🌎 AI Travel Planner")
 
     # ── Tab layout: One-shot plan vs. Conversational ──

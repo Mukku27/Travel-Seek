@@ -39,7 +39,7 @@ class UserPreferences(BaseModel):
 
     def update_from(self, other: "UserPreferences") -> None:
         """Merge non-None fields from another preferences object."""
-        for field_name in self.model_fields:
+        for field_name in type(self).model_fields:
             new_val = getattr(other, field_name)
             if new_val is not None and new_val != [] and new_val != "":
                 setattr(self, field_name, new_val)

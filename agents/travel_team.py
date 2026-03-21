@@ -4,20 +4,31 @@ travel_team.py
 Team orchestrator that coordinates the 4 specialized agents.
 Supports multi-turn conversational planning with session memory
 persisted in SQLite.
+
+When GOOGLE_MAPS_API_KEY is available, the Research and Itinerary agents
+gain access to Google Places / Directions tools via a custom MCP server.
+If the key is missing or the MCP connection fails, the team falls back
+gracefully to DuckDuckGo-only mode.
 """
 
+import asyncio
 import json
+import os
 import re
+import sys
+
 import streamlit as st
 from agno.agent import Agent
 from agno.models.groq import Groq
 from agno.team.team import Team
+from agno.tools.mcp import MCPTools
 from agno.db.sqlite.sqlite import SqliteDb
 
 from agents.research_agent import create_research_agent
 from agents.itinerary_agent import create_itinerary_agent
 from agents.budget_agent import create_budget_agent
 from agents.local_expert_agent import create_local_expert_agent
+from mcp_servers.config import get_api_key, validate_google_maps_access
 from models import UserPreferences
 from prompt import get_travel_plan_prompt, get_answer_question_prompt
 from utils import clean_response
@@ -31,9 +42,28 @@ class TravelTeam:
     def __init__(self, session_id: str = "default"):
         self.session_id = session_id
         self.db = SqliteDb(db_file=DB_FILE)
+        self.mcp_available = False
+        self.mcp_status_reason: str | None = None
+        self._mcp_tools: MCPTools | None = None
+        self._async_loop: asyncio.AbstractEventLoop | None = None
 
-        self.research_agent = create_research_agent()
-        self.itinerary_agent = create_itinerary_agent()
+        has_key = bool(os.getenv("GOOGLE_MAPS_API_KEY"))
+        if has_key:
+            try:
+                validate_google_maps_access(get_api_key())
+                self._mcp_tools = self._connect_mcp()
+                self.mcp_status_reason = None
+                self.mcp_available = True
+            except Exception as exc:
+                self.mcp_available = False
+                self._mcp_tools = None
+                self.mcp_status_reason = self._format_mcp_error(exc)
+        else:
+            self.mcp_status_reason = "Google Places API unavailable because GOOGLE_MAPS_API_KEY is not set."
+
+        mcp = self._mcp_tools if self.mcp_available else None
+        self.research_agent = create_research_agent(mcp_tools=mcp)
+        self.itinerary_agent = create_itinerary_agent(mcp_tools=mcp)
         self.budget_agent = create_budget_agent()
         self.local_expert_agent = create_local_expert_agent()
 
@@ -59,6 +89,8 @@ class TravelTeam:
                 "Format the final output in clean markdown with clear section headers.",
                 "When the user asks to modify the plan, only update the relevant sections.",
                 "Always consider the accumulated user preferences and conversation history.",
+                "Keep exact factual details grounded in member outputs and tool results.",
+                "Do not invent exact prices, venue status, or transit line details when they were not verified.",
             ],
             session_id=session_id,
             db=self.db,
@@ -69,7 +101,6 @@ class TravelTeam:
             debug_mode=True,
         )
 
-        # Preference extraction agent (lightweight, no tools needed)
         self.preference_extractor = Agent(
             name="Preference Extractor",
             model=Groq(id="qwen/qwen3-32b"),
@@ -85,14 +116,86 @@ class TravelTeam:
             markdown=False,
         )
 
+    # ── MCP lifecycle ──────────────────────────────────────────────
+
+    def _get_async_loop(self) -> asyncio.AbstractEventLoop:
+        if self._async_loop is None or self._async_loop.is_closed():
+            self._async_loop = asyncio.new_event_loop()
+        return self._async_loop
+
+    def _run_async(self, coro):
+        """Run async MCP work on a dedicated event loop owned by this team."""
+        loop = self._get_async_loop()
+        try:
+            asyncio.set_event_loop(loop)
+            return loop.run_until_complete(coro)
+        finally:
+            asyncio.set_event_loop(None)
+
+    @staticmethod
+    def _format_mcp_error(exc: Exception) -> str:
+        msg = str(exc)
+        upper = msg.upper()
+        if "REQUEST_DENIED" in upper:
+            return (
+                "Google Places API unavailable because Google rejected the configured key. "
+                "Enable the Places, Directions, and Geocoding APIs and check billing."
+            )
+        if "OVER_QUERY_LIMIT" in upper:
+            return (
+                "Google Places API unavailable because the configured Google Maps project is over quota "
+                "or billing is not active."
+            )
+        if "FAILED TO INITIALIZE" in upper:
+            return "Google Places MCP connection failed during tool initialization."
+        return f"Google Places MCP unavailable: {msg}"
+
+    def _connect_mcp(self) -> MCPTools:
+        """Create and connect MCPTools to the places MCP server (stdio)."""
+        server_cmd = f"{sys.executable} -m mcp_servers.places_server"
+        mcp_tools = MCPTools(command=server_cmd)
+        self._run_async(mcp_tools.connect())
+        if not mcp_tools.initialized:
+            raise RuntimeError("Places MCP tools failed to initialize.")
+        return mcp_tools
+
+    def disconnect_mcp(self) -> None:
+        if self._mcp_tools is not None:
+            try:
+                self._run_async(self._mcp_tools.close())
+            except Exception:
+                pass
+            self._mcp_tools = None
+            self.mcp_available = False
+        if self._async_loop is not None and not self._async_loop.is_closed():
+            try:
+                self._async_loop.run_until_complete(self._async_loop.shutdown_asyncgens())
+            except Exception:
+                pass
+            self._async_loop.close()
+        self._async_loop = None
+
+    # ── Private helpers ────────────────────────────────────────────
+
+    def _run_team(self, prompt: str):
+        """Run the team, with async bridge for MCP compatibility."""
+        if self.mcp_available:
+            return self._run_async(self.team.arun(prompt))
+        return self.team.run(prompt)
+
+    def _extract_content(self, response) -> str:
+        if hasattr(response, "content"):
+            return clean_response(response.content)
+        return clean_response(str(response))
+
+    # ── Public API ─────────────────────────────────────────────────
+
     def extract_preferences(self, message: str, current_prefs: UserPreferences) -> UserPreferences:
         """Extract preferences from a user message and merge with existing ones."""
         try:
             response = self.preference_extractor.run(message)
             raw = response.content if hasattr(response, "content") else str(response)
-            # Strip <think>...</think> reasoning tags (Qwen3)
             raw = re.sub(r"<think>.*?</think>", "", raw, flags=re.DOTALL)
-            # Strip markdown fences if present
             raw = raw.strip()
             if raw.startswith("```"):
                 raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
@@ -103,11 +206,10 @@ class TravelTeam:
             extracted = UserPreferences.model_validate_json(raw)
             current_prefs.update_from(extracted)
         except Exception:
-            pass  # If extraction fails, keep current prefs unchanged
+            pass
         return current_prefs
 
     def _build_context_prompt(self, message: str, preferences: UserPreferences) -> str:
-        """Build a prompt that includes accumulated preferences as context."""
         pref_summary = preferences.summary()
         return (
             f"## Current User Preferences\n{pref_summary}\n\n"
@@ -122,12 +224,9 @@ class TravelTeam:
             destination, present_location, start_date, end_date,
             budget, travel_style, duration,
         )
-        response = self.team.run(prompt)
         try:
-            if hasattr(response, "content"):
-                clean_resp = clean_response(response.content)
-            else:
-                clean_resp = clean_response(str(response))
+            response = self._run_team(prompt)
+            clean_resp = self._extract_content(response)
             st.session_state.travel_plan = clean_resp
             return clean_resp
         except Exception as e:
@@ -138,21 +237,23 @@ class TravelTeam:
         """Handle a conversational message with context from preferences and history."""
         preferences = self.extract_preferences(message, preferences)
         prompt = self._build_context_prompt(message, preferences)
-        response = self.team.run(prompt)
         try:
-            if hasattr(response, "content"):
-                return clean_response(response.content)
-            return clean_response(str(response))
+            response = self._run_team(prompt)
+            return self._extract_content(response)
         except Exception as e:
             return f"Error: {str(e)}"
 
     def answer_question(self, question, travel_plan, destination):
         prompt = get_answer_question_prompt(destination, travel_plan, question)
-        response = self.team.run(prompt)
         try:
-            if hasattr(response, "content"):
-                return clean_response(response.content)
-            return clean_response(str(response))
+            response = self._run_team(prompt)
+            return self._extract_content(response)
         except Exception as e:
             st.error(f"Error generating answer: {str(e)}")
             return None
+
+    def __del__(self):
+        try:
+            self.disconnect_mcp()
+        except Exception:
+            pass
