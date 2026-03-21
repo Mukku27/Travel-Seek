@@ -33,6 +33,9 @@ def _mock_agno():
         patch("agents.itinerary_agent.Groq") as _,
         patch("agents.budget_agent.Agent") as _,
         patch("agents.budget_agent.Groq") as _,
+        patch("agents.budget_agent.TravelSearchTools") as _,
+        patch("agents.budget_agent.DuckDuckGoTools") as _,
+        patch("agents.budget_agent.TavilyTools") as _,
         patch("agents.local_expert_agent.Agent") as _,
         patch("agents.local_expert_agent.Groq") as _,
     ):
