@@ -34,6 +34,11 @@ Create a `.env` file in the root directory:
 ```sh
 GROQ_API_KEY='your_groq_api_key'
 GOOGLE_MAPS_API_KEY='your_google_maps_api_key'   # Optional — enables Places & Directions
+SERPI_API_KEY='your_serpi_api_key'
+
+# Optional: enable Tavily search alongside SerpAPI/DuckDuckGo
+USE_TAVILY='true'
+TAVILY_API_KEY='your_tavily_api_key'
 ```
 
 The `GOOGLE_MAPS_API_KEY` requires the following APIs enabled in your Google Cloud project:
@@ -42,6 +47,7 @@ The `GOOGLE_MAPS_API_KEY` requires the following APIs enabled in your Google Clo
 - Geocoding API
 
 If the key is not set, the app works normally using DuckDuckGo for all research.
+If `USE_TAVILY` is enabled and `TAVILY_API_KEY` is present, the research agent can use Tavily alongside DuckDuckGo.
 
 ## Usage
 

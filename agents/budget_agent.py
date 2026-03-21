@@ -2,20 +2,27 @@
 budget_agent.py
 
 Estimates costs across budget tiers and suggests money-saving alternatives.
-Uses DuckDuckGo for price lookups.
+Uses DuckDuckGo for price lookups, with optional Tavily support.
 """
+
+import os
 
 from agno.agent import Agent
 from agno.models.groq import Groq
 from agno.tools.duckduckgo import DuckDuckGoTools
+from agno.tools.tavily import TavilyTools
 
 
 def create_budget_agent() -> Agent:
+    tools = [DuckDuckGoTools()]
+    if os.getenv("USE_TAVILY", "").lower() in ("1", "true", "yes"):
+        tools.append(TavilyTools())
+
     return Agent(
         name="Budget Analyst",
         role="Travel Budget and Cost Specialist",
         model=Groq(id="qwen/qwen3-32b"),
-        tools=[DuckDuckGoTools()],
+        tools=tools,
         instructions=[
             "You are a travel budget analyst.",
             "Provide detailed cost estimates for the travel plan across three tiers:",

@@ -17,7 +17,6 @@ import os
 import re
 import sys
 
-import nest_asyncio
 import streamlit as st
 from agno.agent import Agent
 from agno.models.groq import Groq
@@ -29,23 +28,12 @@ from agents.research_agent import create_research_agent
 from agents.itinerary_agent import create_itinerary_agent
 from agents.budget_agent import create_budget_agent
 from agents.local_expert_agent import create_local_expert_agent
+from mcp_servers.config import get_api_key, validate_google_maps_access
 from models import UserPreferences
 from prompt import get_travel_plan_prompt, get_answer_question_prompt
 from utils import clean_response
 
-nest_asyncio.apply()
-
 DB_FILE = "tmp/travel_sessions.db"
-
-
-def _run_async(coro):
-    """Bridge helper: run an async coroutine from synchronous code."""
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    return loop.run_until_complete(coro)
 
 
 class TravelTeam:
@@ -55,16 +43,23 @@ class TravelTeam:
         self.session_id = session_id
         self.db = SqliteDb(db_file=DB_FILE)
         self.mcp_available = False
+        self.mcp_status_reason: str | None = None
         self._mcp_tools: MCPTools | None = None
+        self._async_loop: asyncio.AbstractEventLoop | None = None
 
         has_key = bool(os.getenv("GOOGLE_MAPS_API_KEY"))
         if has_key:
             try:
+                validate_google_maps_access(get_api_key())
                 self._mcp_tools = self._connect_mcp()
+                self.mcp_status_reason = None
                 self.mcp_available = True
-            except Exception:
+            except Exception as exc:
                 self.mcp_available = False
                 self._mcp_tools = None
+                self.mcp_status_reason = self._format_mcp_error(exc)
+        else:
+            self.mcp_status_reason = "Google Places API unavailable because GOOGLE_MAPS_API_KEY is not set."
 
         mcp = self._mcp_tools if self.mcp_available else None
         self.research_agent = create_research_agent(mcp_tools=mcp)
@@ -94,6 +89,8 @@ class TravelTeam:
                 "Format the final output in clean markdown with clear section headers.",
                 "When the user asks to modify the plan, only update the relevant sections.",
                 "Always consider the accumulated user preferences and conversation history.",
+                "Keep exact factual details grounded in member outputs and tool results.",
+                "Do not invent exact prices, venue status, or transit line details when they were not verified.",
             ],
             session_id=session_id,
             db=self.db,
@@ -121,28 +118,69 @@ class TravelTeam:
 
     # ── MCP lifecycle ──────────────────────────────────────────────
 
+    def _get_async_loop(self) -> asyncio.AbstractEventLoop:
+        if self._async_loop is None or self._async_loop.is_closed():
+            self._async_loop = asyncio.new_event_loop()
+        return self._async_loop
+
+    def _run_async(self, coro):
+        """Run async MCP work on a dedicated event loop owned by this team."""
+        loop = self._get_async_loop()
+        try:
+            asyncio.set_event_loop(loop)
+            return loop.run_until_complete(coro)
+        finally:
+            asyncio.set_event_loop(None)
+
+    @staticmethod
+    def _format_mcp_error(exc: Exception) -> str:
+        msg = str(exc)
+        upper = msg.upper()
+        if "REQUEST_DENIED" in upper:
+            return (
+                "Google Places API unavailable because Google rejected the configured key. "
+                "Enable the Places, Directions, and Geocoding APIs and check billing."
+            )
+        if "OVER_QUERY_LIMIT" in upper:
+            return (
+                "Google Places API unavailable because the configured Google Maps project is over quota "
+                "or billing is not active."
+            )
+        if "FAILED TO INITIALIZE" in upper:
+            return "Google Places MCP connection failed during tool initialization."
+        return f"Google Places MCP unavailable: {msg}"
+
     def _connect_mcp(self) -> MCPTools:
         """Create and connect MCPTools to the places MCP server (stdio)."""
         server_cmd = f"{sys.executable} -m mcp_servers.places_server"
         mcp_tools = MCPTools(command=server_cmd)
-        _run_async(mcp_tools.connect())
+        self._run_async(mcp_tools.connect())
+        if not mcp_tools.initialized:
+            raise RuntimeError("Places MCP tools failed to initialize.")
         return mcp_tools
 
     def disconnect_mcp(self) -> None:
         if self._mcp_tools is not None:
             try:
-                _run_async(self._mcp_tools.close())
+                self._run_async(self._mcp_tools.close())
             except Exception:
                 pass
             self._mcp_tools = None
             self.mcp_available = False
+        if self._async_loop is not None and not self._async_loop.is_closed():
+            try:
+                self._async_loop.run_until_complete(self._async_loop.shutdown_asyncgens())
+            except Exception:
+                pass
+            self._async_loop.close()
+        self._async_loop = None
 
     # ── Private helpers ────────────────────────────────────────────
 
     def _run_team(self, prompt: str):
         """Run the team, with async bridge for MCP compatibility."""
         if self.mcp_available:
-            return _run_async(self.team.arun(prompt))
+            return self._run_async(self.team.arun(prompt))
         return self.team.run(prompt)
 
     def _extract_content(self, response) -> str:
@@ -213,3 +251,9 @@ class TravelTeam:
         except Exception as e:
             st.error(f"Error generating answer: {str(e)}")
             return None
+
+    def __del__(self):
+        try:
+            self.disconnect_mcp()
+        except Exception:
+            pass

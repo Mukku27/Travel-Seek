@@ -135,7 +135,7 @@ try:
 
     if not travel_agent.mcp_available:
         st.warning(
-            "Google Places API unavailable (GOOGLE_MAPS_API_KEY not set or MCP connection failed). "
+            f"{travel_agent.mcp_status_reason or 'Google Places API unavailable.'} "
             "Using DuckDuckGo fallback — results may be less precise."
         )
 

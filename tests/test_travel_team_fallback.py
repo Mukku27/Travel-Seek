@@ -58,7 +58,10 @@ def test_no_api_key_means_mcp_unavailable(_mock_agno):
 
 def test_with_api_key_but_connection_fails(_mock_agno):
     with patch.dict(os.environ, {"GOOGLE_MAPS_API_KEY": "test_key"}):
-        with patch("agents.travel_team.MCPTools") as mock_mcp_cls:
+        with (
+            patch("agents.travel_team.validate_google_maps_access"),
+            patch("agents.travel_team.MCPTools") as mock_mcp_cls,
+        ):
             mock_mcp = MagicMock()
             mock_mcp.connect = AsyncMock(side_effect=ConnectionError("fail"))
             mock_mcp_cls.return_value = mock_mcp
@@ -68,6 +71,25 @@ def test_with_api_key_but_connection_fails(_mock_agno):
             team = TravelTeam(session_id="test")
             assert team.mcp_available is False
             assert team._mcp_tools is None
+
+
+def test_with_api_key_but_tools_never_initialize(_mock_agno):
+    with patch.dict(os.environ, {"GOOGLE_MAPS_API_KEY": "test_key"}):
+        with (
+            patch("agents.travel_team.validate_google_maps_access"),
+            patch("agents.travel_team.MCPTools") as mock_mcp_cls,
+        ):
+            mock_mcp = MagicMock()
+            mock_mcp.connect = AsyncMock(return_value=None)
+            mock_mcp.initialized = False
+            mock_mcp_cls.return_value = mock_mcp
+
+            from agents.travel_team import TravelTeam
+
+            team = TravelTeam(session_id="test")
+            assert team.mcp_available is False
+            assert team._mcp_tools is None
+            assert "failed during tool initialization" in team.mcp_status_reason.lower()
 
 
 def test_fallback_uses_sync_run(_mock_agno):
