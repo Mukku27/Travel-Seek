@@ -7,8 +7,10 @@ persisted in SQLite.
 
 When GOOGLE_MAPS_API_KEY is available, the Research and Itinerary agents
 gain access to Google Places / Directions tools via a custom MCP server.
-If the key is missing or the MCP connection fails, the team falls back
-gracefully to DuckDuckGo-only mode.
+When OPENWEATHERMAP_API_KEY is available, those agents also gain access
+to verified OpenWeather forecast tools.
+If a key is missing or a dependency fails, the team falls back
+gracefully instead of disabling the rest of the planner.
 """
 
 import asyncio
@@ -29,6 +31,7 @@ from agents.itinerary_agent import create_itinerary_agent
 from agents.budget_agent import create_budget_agent
 from agents.local_expert_agent import create_local_expert_agent
 from mcp_servers.config import get_api_key, validate_google_maps_access
+from tools import WeatherTools
 from models import UserPreferences
 from prompt import get_travel_plan_prompt, get_answer_question_prompt
 from utils import clean_response
@@ -44,8 +47,24 @@ class TravelTeam:
         self.db = SqliteDb(db_file=DB_FILE)
         self.mcp_available = False
         self.mcp_status_reason: str | None = None
+        self.weather_available = False
+        self.weather_status_reason: str | None = None
         self._mcp_tools: MCPTools | None = None
+        self._weather_tools: WeatherTools | None = None
         self._async_loop: asyncio.AbstractEventLoop | None = None
+
+        has_weather_key = bool(os.getenv("OPENWEATHERMAP_API_KEY"))
+        if has_weather_key:
+            try:
+                self._weather_tools = WeatherTools()
+                self.weather_available = True
+            except Exception as exc:
+                self._weather_tools = None
+                self.weather_status_reason = f"OpenWeather tools unavailable: {exc}"
+        else:
+            self.weather_status_reason = (
+                "OpenWeather API unavailable because OPENWEATHERMAP_API_KEY is not set."
+            )
 
         has_key = bool(os.getenv("GOOGLE_MAPS_API_KEY"))
         if has_key:
@@ -62,8 +81,15 @@ class TravelTeam:
             self.mcp_status_reason = "Google Places API unavailable because GOOGLE_MAPS_API_KEY is not set."
 
         mcp = self._mcp_tools if self.mcp_available else None
-        self.research_agent = create_research_agent(mcp_tools=mcp)
-        self.itinerary_agent = create_itinerary_agent(mcp_tools=mcp)
+        weather = self._weather_tools if self.weather_available else None
+        self.research_agent = create_research_agent(
+            mcp_tools=mcp,
+            weather_tools=weather,
+        )
+        self.itinerary_agent = create_itinerary_agent(
+            mcp_tools=mcp,
+            weather_tools=weather,
+        )
         self.budget_agent = create_budget_agent()
         self.local_expert_agent = create_local_expert_agent()
 
@@ -91,6 +117,7 @@ class TravelTeam:
                 "Always consider the accumulated user preferences and conversation history.",
                 "Keep exact factual details grounded in member outputs and tool results.",
                 "Do not invent exact prices, venue status, or transit line details when they were not verified.",
+                "When weather tools report that exact forecast dates are unavailable, say so explicitly instead of inferring weather for those dates.",
             ],
             session_id=session_id,
             db=self.db,

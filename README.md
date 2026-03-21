@@ -1,11 +1,12 @@
 # Travel-Seek
 
-Travel-Seek is an AI-powered travel planning assistant that helps you create personalized travel itineraries and answer travel-related questions. The application leverages a coordinated multi-agent team (powered by Agno + Groq) and optionally enriches results with real Google Places & Directions data via a custom MCP server.
+Travel-Seek is an AI-powered travel planning assistant that helps you create personalized travel itineraries and answer travel-related questions. The application leverages a coordinated multi-agent team (powered by Agno + Groq) and optionally enriches results with real Google Places & Directions data via a custom MCP server plus verified OpenWeather forecasts.
 
 ## Features
 
 - **Multi-Agent Travel Planning**: Four specialized AI agents (Research, Itinerary, Budget, Local Expert) coordinate to produce comprehensive travel plans.
 - **Google Places Integration**: Real ratings, reviews, hours, and directions via a custom MCP server backed by the Google Maps API.
+- **OpenWeather Integration**: Verified current conditions and 5-day forecasts, with explicit long-range limitations instead of fabricated weather detail.
 - **Conversational Planning**: Chat naturally to build and refine your plan with session memory.
 - **Graceful Fallback**: Works without a Google Maps key — falls back to DuckDuckGo search with a visible warning.
 - **Standalone MCP Server**: The Places MCP server works independently with Claude Desktop or any MCP-compatible client.
@@ -34,6 +35,7 @@ Create a `.env` file in the root directory:
 ```sh
 GROQ_API_KEY='your_groq_api_key'
 GOOGLE_MAPS_API_KEY='your_google_maps_api_key'   # Optional — enables Places & Directions
+OPENWEATHERMAP_API_KEY='your_openweather_api_key' # Optional — enables verified weather tools
 SERPI_API_KEY='your_serpi_api_key'
 
 # Optional: enable Tavily search alongside SerpAPI/DuckDuckGo
@@ -48,6 +50,7 @@ The `GOOGLE_MAPS_API_KEY` requires the following APIs enabled in your Google Clo
 
 If the key is not set, the app works normally using DuckDuckGo for all research.
 If `USE_TAVILY` is enabled and `TAVILY_API_KEY` is present, the research agent can use Tavily alongside DuckDuckGo.
+If `OPENWEATHERMAP_API_KEY` is set, the planner can use real OpenWeather current conditions and 5-day forecasts. For trips beyond that forecast window, the app tells the traveler to recheck later instead of inventing day-level weather.
 
 ## Usage
 
@@ -74,6 +77,9 @@ Travel-Seek/
 │   ├── itinerary_agent.py    # Day-by-day planner + optional Directions
 │   ├── budget_agent.py       # Cost estimates via DuckDuckGo
 │   └── local_expert_agent.py # Cultural tips via DuckDuckGo
+├── tools/
+│   ├── __init__.py
+│   └── weather_tool.py       # OpenWeather toolkit for live weather guidance
 ├── mcp_servers/
 │   ├── __init__.py
 │   ├── config.py             # API key management & client factory
@@ -84,6 +90,8 @@ Travel-Seek/
 │   ├── test_places_server.py
 │   ├── test_mcp_config.py
 │   ├── test_travel_team_fallback.py
+│   ├── test_weather_tool.py
+│   ├── test_weather_tool_live.py
 │   ├── test_models.py
 │   └── test_utils.py
 ├── app.py                    # Streamlit entry point

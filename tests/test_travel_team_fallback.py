@@ -116,3 +116,24 @@ def test_disconnect_mcp_is_safe_when_not_connected(_mock_agno):
         team = TravelTeam(session_id="test")
         team.disconnect_mcp()  # should not raise
         assert team.mcp_available is False
+
+
+def test_weather_key_missing_means_weather_unavailable(_mock_agno):
+    with patch.dict(os.environ, {}, clear=True):
+        os.environ.pop("OPENWEATHERMAP_API_KEY", None)
+        from agents.travel_team import TravelTeam
+
+        team = TravelTeam(session_id="test")
+        assert team.weather_available is False
+        assert team._weather_tools is None
+
+
+def test_weather_key_enables_weather_tools(_mock_agno):
+    with patch.dict(os.environ, {"OPENWEATHERMAP_API_KEY": "weather_key"}):
+        with patch("agents.travel_team.WeatherTools") as mock_weather_tools:
+            mock_weather_tools.return_value = MagicMock()
+            from agents.travel_team import TravelTeam
+
+            team = TravelTeam(session_id="test")
+            assert team.weather_available is True
+            assert team._weather_tools is not None

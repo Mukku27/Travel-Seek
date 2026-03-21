@@ -2,25 +2,38 @@
 itinerary_agent.py
 
 Builds optimized day-by-day itineraries from research findings.
-Optionally uses Google Directions via MCP tools for real travel-time data.
+Optionally uses Google Directions via MCP tools for real travel-time data
+and OpenWeather tools for verified trip-date weather guidance.
 """
 
 from agno.agent import Agent
 from agno.models.groq import Groq
 
 
-def create_itinerary_agent(mcp_tools=None) -> Agent:
+def create_itinerary_agent(mcp_tools=None, weather_tools=None) -> Agent:
     tools: list = []
     if mcp_tools is not None:
         tools.append(mcp_tools)
+    if weather_tools is not None:
+        tools.append(weather_tools)
 
     extra_instructions = []
     if mcp_tools is not None:
-        extra_instructions = [
+        extra_instructions.extend([
             "You have access to Google Directions API via MCP tools.",
             "Use get_directions to compute real travel times between locations.",
             "Include the actual distance and duration in the itinerary.",
-        ]
+        ])
+    if weather_tools is not None:
+        extra_instructions.extend([
+            "You have access to OpenWeatherMap weather tools.",
+            "Use get_trip_weather_guidance for trip-date weather checks.",
+            "Only include a day-specific weather summary when get_trip_weather_guidance returns an exact forecast for that date.",
+            "If the response says exact forecast dates are unavailable, say that clearly and do not invent day-level weather.",
+            "Schedule indoor activities (museums, galleries, shopping) on rainy or extreme weather days.",
+            "Recommend outdoor activities (parks, walking tours, beaches) on clear and pleasant days.",
+            "Add packing suggestions at the end based on the overall weather forecast.",
+        ])
 
     return Agent(
         name="Itinerary Planner",
