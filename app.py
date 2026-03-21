@@ -133,10 +133,15 @@ with st.sidebar:
 try:
     travel_agent = TravelTeam(session_id=st.session_state.session_id)
 
+    if not travel_agent.mcp_available:
+        st.warning(
+            f"{travel_agent.mcp_status_reason or 'Google Places API unavailable.'} "
+            "Using DuckDuckGo fallback — results may be less precise."
+        )
     if not travel_agent.weather_available:
         st.info(
-            "Weather API unavailable (OPENWEATHERMAP_API_KEY not set). "
-            "Weather data will come from general web searches instead of real-time forecasts."
+            f"{travel_agent.weather_status_reason or 'OpenWeather API unavailable.'} "
+            "Weather guidance will fall back to general web research."
         )
 
     st.title("🌎 AI Travel Planner")

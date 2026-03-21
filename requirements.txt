@@ -2,8 +2,13 @@ streamlit
 agno
 groq
 ddgs
+tavily-python
 pycountry
 python-dotenv
 sqlalchemy
 requests
+googlemaps
+fastmcp
+nest-asyncio
 pytest
+pytest-asyncio

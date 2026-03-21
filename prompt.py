@@ -33,8 +33,10 @@ Provide a structured markdown response that includes the following elements:
 
 🌞 Best Time to Visit & Weather:
  - Highlight seasonal considerations for visiting {destination}.
- - Day-by-day weather forecast from {start_date} to {end_date} (use weather tools if available).
- - For each day, indicate whether the weather favors indoor or outdoor activities.
+ - Day-by-day weather forecast from {start_date} to {end_date} when verified weather tools can provide those exact dates.
+ - If exact forecast dates are unavailable, say so clearly, avoid guessing daily conditions, and tell the traveler when to recheck.
+ - Do not substitute uncited historical averages or seasonal ranges for missing exact forecast dates.
+ - For each verified forecast day, indicate whether the weather favors indoor or outdoor activities.
  - Alternative date suggestions if weather is unfavorable. Include source links for all weather data.
  - Offer clothing and packing recommendations based on weather forecasts (e.g., warm jackets for cold days, light clothing for sunny days, umbrella for rain).
  - Provide a consolidated packing checklist based on the overall weather conditions.
@@ -73,6 +75,7 @@ Provide a structured markdown response that includes the following elements:
 Output Requirements:
  - Use clear, easy-to-read markdown with headings and bullet points.
  - Provide source links, booking references, and maps wherever applicable.
+ - If a detail could not be verified from a tool result or cited source, say it needs confirmation instead of guessing.
  - Ensure all details are actionable and well-organized.
 """
     return prompt
