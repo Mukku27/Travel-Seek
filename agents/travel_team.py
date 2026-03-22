@@ -110,6 +110,8 @@ class TravelTeam:
                 "2. Itinerary Planner: Build a day-by-day plan from the research",
                 "3. Budget Analyst: Estimate costs and provide budget tiers",
                 "4. Local Expert: Add insider tips and cultural context",
+                "Ensure the Budget Analyst uses tool-backed flight and hotel pricing when origin/destination/dates are provided.",
+                "Include booking links for the priced flight and accommodation options in the final budget section.",
                 "After all agents respond, compile their outputs into one cohesive travel plan.",
                 "Ensure no duplicate information across sections.",
                 "Format the final output in clean markdown with clear section headers.",
